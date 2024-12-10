@@ -4,6 +4,7 @@ require 'erb'
 require 'rexml/document'
 require 'fileutils'
 require 'digest/md5'
+require 'msf/ui/console/msf_readline'
 
 module Msf
 module Ui
@@ -107,7 +108,7 @@ class Driver < Msf::Ui::Driver
     # Initialize the user interface to use a different input and output
     # handle if one is supplied
     input = opts['LocalInput']
-    input ||= Rex::Ui::Text::Input::Stdio.new
+    input ||= Msf::Ui::Console::MsfReadline.new(nil)
 
     if !opts['Readline']
       input.disable_readline

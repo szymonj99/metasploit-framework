@@ -1,5 +1,6 @@
 # -*- coding: binary -*-
 require 'rex/text/color'
+require 'msf/ui/console/msf_readline'
 
 module Rex
 module Ui
@@ -66,8 +67,19 @@ module Shell
   def init_tab_complete
     if (self.input and self.input.supports_readline)
       # Unless cont_flag because there's no tab complete for continuation lines
-      self.input = Input::Readline.new(lambda { |str| tab_complete(str) unless cont_flag })
-      self.input.output = self.output
+      # Special-case MsfReadline
+      if self.input.respond_to?(:input_impl)
+        completion_proc = case self.input.input_impl
+        when ::Rex::Ui::Text::Input::Reline
+          lambda { |preposing, str, _postposing| tab_complete("#{preposing}#{str}") unless cont_flag }
+        when ::Rex::Ui::Text::Input::Readline
+          lambda { |str| tab_complete(str) unless cont_flag }
+        end
+      else
+        completion_proc = lambda { |str| tab_complete(str) unless cont_flag }
+      end
+
+      self.input.reset_tab_completion(completion_proc)
     end
   end
 

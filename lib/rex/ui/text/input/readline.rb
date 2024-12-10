@@ -18,6 +18,7 @@ begin
     # Initializes the readline-aware Input instance for text.
     #
     def initialize(tab_complete_proc = nil)
+      super()
       if(not Object.const_defined?('Readline'))
         require 'readline'
       end
@@ -100,6 +101,7 @@ begin
         ::Readline::HISTORY.pop if (line and line.empty?)
       ensure
         Thread.current.priority = orig || 0
+        output.prompting(false)
       end
 
       line
