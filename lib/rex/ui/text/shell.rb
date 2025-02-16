@@ -65,9 +65,24 @@ module Shell
 
   def init_tab_complete
     if (self.input and self.input.supports_readline)
-      # Unless cont_flag because there's no tab complete for continuation lines
-      self.input = Input::Readline.new(lambda { |str| tab_complete(str) unless cont_flag })
+      # Don't re-create a new input object for every call.
+      if self.input.is_a?(Input::Readline)
+        self.input.reset_tab_completion
+      else
+        # Unless cont_flag because there's no tab complete for continuation lines
+        reline_enabled = Msf::FeatureManager.instance.enabled?(Msf::FeatureManager::USE_RELINE)
+        self.input = Input::Readline.new(create_complete_proc(use_reline: reline_enabled), use_reline: reline_enabled)
+      end
+
       self.input.output = self.output
+    end
+  end
+
+  def create_complete_proc(**opts)
+    if opts[:use_reline]
+       Proc.new{ |preposing,str, _postposing| tab_complete("#{preposing}#{str}") }
+    else
+      Proc.new{ |str| tab_complete(str) }
     end
   end
 
