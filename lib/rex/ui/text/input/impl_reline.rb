@@ -5,7 +5,11 @@ module Ui
 module Text
 
   class Input::ImplReline < Rex::Ui::Text::Input
-    def initialize(tab_complete_proc = nil, **opts)
+
+    require_relative 'common_readline_impl' unless defined?(CommonReadlineImpl)
+    include CommonReadlineImpl
+
+    def initialize(tab_complete_proc = nil, **args)
       super()
       require 'reline' unless defined?(::Reline)
 
@@ -17,6 +21,7 @@ module Text
         ::Reline.completion_proc = @rl_saved_proc
       end
 
+      self.fd = args[:fd] || $stdin
     end
 
     def reset_tab_completion(tab_complete_proc = nil)
@@ -29,26 +34,6 @@ module Text
     #
     def line_buffer
       ::Reline.line_buffer
-    end
-
-    def supports_readline
-      true
-    end
-
-    def sysread(len = 1)
-      begin
-        self.fd.sysread(len)
-      rescue ::Errno::EINTR
-        retry
-      end
-    end
-
-    def gets
-      begin
-        self.fd.gets
-      rescue ::Errno::EINTR
-        retry
-      end
     end
 
     def pgets
@@ -68,23 +53,6 @@ module Text
 
       line
     end
-
-    def fd
-      $stdin
-    end
-
-    def intrinsic_shell?
-      true
-    end
-
-    #
-    # The prompt that is to be displayed.
-    #
-    attr_accessor :prompt
-    #
-    # The output handle to use when displaying the prompt.
-    #
-    attr_accessor :output
 
     def reline_with_output(prompt, add_history=false)
       input_on_entry = ::Reline::IOGate.instance_variable_get(:@input)
@@ -110,19 +78,9 @@ module Text
         ::Reline::HISTORY.pop
       end
 
-      line.dup
+      line
     end
 
-    private
-
-    def with_error_handling(proc)
-      proc do |*args|
-        proc.call(*args)
-      rescue StandardError => e
-        elog("proc #{proc.inspect} has failed with args #{args}", error: e)
-        []
-      end
-    end
   end
 
 end

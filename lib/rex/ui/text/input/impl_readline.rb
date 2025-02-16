@@ -7,6 +7,10 @@ module Ui
 module Text
 
   class Input::ImplReadline < Rex::Ui::Text::Input
+
+    require_relative 'common_readline_impl' unless defined?(CommonReadlineImpl)
+    include CommonReadlineImpl
+
     def initialize(tab_complete_proc = nil, **args)
       super()
       require 'readline' unless defined?(::Readline)
@@ -18,6 +22,8 @@ module Text
         @rl_saved_proc = with_error_handling(tab_complete_proc)
         ::Readline.completion_proc = @rl_saved_proc
       end
+
+      self.fd = args[:fd] || $stdin
     end
 
     def reset_tab_completion(tab_complete_proc = nil)
@@ -31,35 +37,6 @@ module Text
     #
     def line_buffer
       defined?(::RbReadline) ? ::RbReadline.rl_line_buffer : ::Readline.line_buffer
-    end
-
-    #
-    # Whether or not the input medium supports readline.
-    #
-    def supports_readline
-      true
-    end
-
-    #
-    # Calls sysread on the standard input handle.
-    #
-    def sysread(len = 1)
-      begin
-        self.fd.sysread(len)
-      rescue ::Errno::EINTR
-        retry
-      end
-    end
-
-    #
-    # Read a line from stdin
-    #
-    def gets()
-      begin
-        self.fd.gets()
-      rescue ::Errno::EINTR
-        retry
-      end
     end
 
     #
@@ -85,30 +62,6 @@ module Text
 
       line
     end
-
-    #
-    # Returns the output pipe handle
-    #
-    def fd
-      $stdin
-    end
-
-    #
-    # Indicates that this input medium as a shell builtin, no need
-    # to extend.
-    #
-    def intrinsic_shell?
-      true
-    end
-
-    #
-    # The prompt that is to be displayed.
-    #
-    attr_accessor :prompt
-    #
-    # The output handle to use when displaying the prompt.
-    #
-    attr_accessor :output
 
     def readline_with_output(prompt, add_history=false)
       # rb-readlines's Readline.readline hardcodes the input and output to
@@ -145,16 +98,6 @@ module Text
       line
     end
 
-    private
-
-    def with_error_handling(proc)
-      proc do |*args|
-        proc.call(*args)
-      rescue StandardError => e
-        elog("proc #{proc.inspect} has failed with args #{args}", error: e)
-        []
-      end
-    end
   end
 
 end

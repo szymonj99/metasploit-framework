@@ -71,18 +71,16 @@ module Shell
       else
         # Unless cont_flag because there's no tab complete for continuation lines
         reline_enabled = Msf::FeatureManager.instance.enabled?(Msf::FeatureManager::USE_RELINE)
-        self.input = Input::Readline.new(create_complete_proc(use_reline: reline_enabled), use_reline: reline_enabled)
+        self.input = Input::Readline.new(create_complete_proc, use_reline: reline_enabled)
       end
 
       self.input.output = self.output
     end
   end
 
-  def create_complete_proc(**opts)
-    if opts[:use_reline]
-       Proc.new{ |preposing,str, _postposing| tab_complete("#{preposing}#{str}") }
-    else
-      Proc.new{ |str| tab_complete(str) }
+  def create_complete_proc
+    proc do |str, preposing = nil, postposing = nil|
+      next cont_flag ? nil : tab_complete("#{preposing}#{str}").map{ |val| val[preposing.to_s.length..] }
     end
   end
 

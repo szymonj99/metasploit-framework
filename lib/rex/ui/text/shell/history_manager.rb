@@ -124,12 +124,7 @@ class HistoryManager
   end
 
   def reline_available?
-    begin
-      require 'reline'
-      defined?(::Reline)
-    rescue ::LoadError => _e
-      false
-    end
+    defined?(::Reline)
   end
 
   def clear_readline
