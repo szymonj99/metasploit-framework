@@ -24,6 +24,7 @@ module Text
       end
 
       self.fd = args[:fd] || $stdin
+      self.output = args[:output] || $stdout
     end
 
     def reset_tab_completion(tab_complete_proc = nil)
@@ -36,7 +37,7 @@ module Text
     # Retrieve the line buffer
     #
     def line_buffer
-      defined?(::RbReadline) ? ::RbReadline.rl_line_buffer : ::Readline.line_buffer
+      ::Readline.line_buffer
     end
 
     #
@@ -45,57 +46,55 @@ module Text
     # background jobs, such as when the user is running Karmetasploit
     #
     def pgets
-
-      line = nil
-      orig = Thread.current.priority
+      original_priority = Thread.current.priority
 
       begin
         Thread.current.priority = -20
-
         output.prompting
-        line = readline_with_output(prompt, true)
-        ::Readline::HISTORY.pop if (line and line.empty?)
+        line = readline_with_output(prompt.to_s, add_history: true)
       ensure
-        Thread.current.priority = orig || 0
+        Thread.current.priority = original_priority || 0
         output.prompting(false)
       end
 
       line
     end
 
-    def readline_with_output(prompt, add_history=false)
-      # rb-readlines's Readline.readline hardcodes the input and output to
-      # $stdin and $stdout, which means setting `Readline.input` or
-      # `Readline.output` has no effect when running `Readline.readline` with
-      # rb-readline, so need to reimplement
-      # []`Readline.readline`](https://github.com/luislavena/rb-readline/blob/ce4908dae45dbcae90a6e42e3710b8c3a1f2cd64/lib/readline.rb#L36-L58)
-      # for rb-readline to support setting input and output.  Output needs to
-      # be set so that colorization works for the prompt on Windows.
-
+    # This closely matches Readline's readline method definition.
+    def readline_with_output(prompt, **args)
       input_on_entry = ::RbReadline.rl_instream
       output_on_entry = ::RbReadline.rl_outstream
-
+      
       begin
-        # ::RbReadline.rl_instream = opts[:fd]
-        # ::RbReadline.rl_outstream = opts[:output]
-        line = ::RbReadline.readline(prompt.to_s)
+        ::RbReadline.rl_instream = args[:fd] if args[:fd]
+        ::RbReadline.rl_outstream = args[:output] if args[:output]
+        line = ::RbReadline.readline(prompt)
       rescue ::StandardError => e
         ::RbReadline.rl_instream = input_on_entry
         ::RbReadline.rl_outstream = output_on_entry
-        ::RbReadline.rl_cleanup_after_signal
-        ::RbReadline.rl_deprep_terminal
+        handle_signal
 
         raise e
       end
 
-      if add_history && line && !line.start_with?(' ')
-        # Don't add duplicate lines to history
-        if ::Readline::HISTORY.empty? || line.strip != ::Readline::HISTORY[-1]
-          ::RbReadline.add_history(line.strip)
-        end
-      end
-
+      add_to_history(line) if args[:add_history]
       line
+    end
+
+    def handle_signal
+      ::RbReadline.rl_cleanup_after_signal
+      ::RbReadline.rl_deprep_terminal
+    end
+
+    def add_to_history(line)
+      return if line&.empty?
+
+      # Don't add duplicate lines to history
+      ::Readline::HISTORY << line unless line == ::Readline::HISTORY[-1]
+    end
+
+    def clear_history
+      ::Readline::HISTORY.pop until ::Readline::HISTORY.empty?
     end
 
   end

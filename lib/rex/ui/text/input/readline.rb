@@ -14,8 +14,8 @@ module Text
     #
     # Initializes the readline-aware Input instance for text.
     #
-    def initialize(tab_complete_proc = nil, **opts)
-      create_impl(tab_complete_proc, **opts)
+    def initialize(tab_complete_proc = nil, **args)
+      create_impl(tab_complete_proc, **args)
       load_methods
     end
 
@@ -23,15 +23,11 @@ module Text
 
     attr_accessor :impl
 
-    def create_impl(tab_complete_proc = nil, **opts)
-      if opts[:use_reline]
-        puts 'using reline'
-        require_relative 'impl_reline' unless defined?(ImplReline)
-        @impl = Rex::Ui::Text::Input::ImplReline.new(tab_complete_proc, **opts)
+    def create_impl(tab_complete_proc = nil, **args)
+      if args[:use_reline]
+        create_reline_impl(tab_complete_proc, **args)
       else
-        puts 'using readline'
-        require_relative 'impl_readline' unless defined?(ImplReadline)
-        @impl = Rex::Ui::Text::Input::ImplReadline.new(tab_complete_proc, **opts)
+        create_readline_impl(tab_complete_proc, **args)
       end
     end
 
@@ -41,6 +37,16 @@ module Text
           @impl.send(method_name, *args, &block)
         end
       end
+    end
+
+    def create_reline_impl(tab_complete_proc = nil, **args)
+      require_relative 'impl_reline' unless defined?(ImplReline)
+      @impl = Rex::Ui::Text::Input::ImplReline.new(tab_complete_proc, **args)
+    end
+
+    def create_readline_impl(tab_complete_proc = nil, **args)
+      require_relative 'impl_readline' unless defined?(ImplReadline)
+      @impl = Rex::Ui::Text::Input::ImplReadline.new(tab_complete_proc, **args)
     end
   end
 end

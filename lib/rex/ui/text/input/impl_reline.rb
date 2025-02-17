@@ -22,6 +22,8 @@ module Text
       end
 
       self.fd = args[:fd] || $stdin
+      # puts "On initialise args output: #{args[:output].inspect}"
+      self.output = args[:output] || $stdout
     end
 
     def reset_tab_completion(tab_complete_proc = nil)
@@ -45,7 +47,7 @@ module Text
         Thread.current.priority = -20
 
         output.prompting
-        line = reline_with_output(prompt, true)
+        line = reline_with_output(prompt, add_history: true, fd: fd, output: output)
       ensure
         Thread.current.priority = orig || 0
         output.prompting(false)
@@ -54,9 +56,10 @@ module Text
       line
     end
 
-    def reline_with_output(prompt, add_history=false)
+    def reline_with_output(prompt, **args)
+      # These are raw IO descriptors. e.g. #<IO:<STDIN>>
       input_on_entry = ::Reline::IOGate.instance_variable_get(:@input)
-      output_on_entry = Reline::IOGate.instance_variable_get(:@output)
+      output_on_entry = Reline.core.instance_variable_get(:@output)
 
       begin
         # TODO: Currently we can't paste in non-ASCII chars. The code below fixes that but breaks out rab completion due
@@ -64,9 +67,11 @@ module Text
         # input_external_encoding = opts[:fd].external_encoding
         # input_internal_encoding = opts[:fd].internal_encoding
         # opts[:fd].set_encoding(::Encoding::UTF_8)
-        # ::Reline.input = opts[:fd]
-        # ::Reline.output = opts[:output]
-        line = ::Reline.readline(prompt.to_s, add_history)
+        # Our args can contain an fd that's either a Rex object, or a raw IO descriptor. Abstract that away.
+
+        ::Reline.input = from_arg(args, :fd)
+        ::Reline.output = from_arg(args, :output)
+        line = ::Reline.readline(prompt.to_s, args[:add_history] || false)
       ensure
         # opts[:fd].set_encoding(input_external_encoding, input_internal_encoding)
         ::Reline.input = input_on_entry
@@ -74,11 +79,31 @@ module Text
       end
 
       # Don't add duplicate lines to history
-      if ::Reline::HISTORY.length > 1 && line == ::Reline::HISTORY[-2]
-        ::Reline::HISTORY.pop
-      end
+      remove_from_history if duplicate_line?(line)
 
       line
+    end
+
+    def from_arg(args, sym)
+      return nil unless args[sym]
+
+      args[sym].respond_to?(:fd) ? args[sym].fd : args[sym]
+    end
+
+    def duplicate_line?(line)
+      return unless line
+
+      ::Reline::HISTORY.length > 1 && line == ::Reline::HISTORY[-1]
+    end
+
+    def remove_from_history
+      ::Reline::HISTORY.pop
+    end
+
+    def clear_history
+      return if ::Reline::HISTORY.empty?
+
+      ::Reline::HISTORY.clear
     end
 
   end
